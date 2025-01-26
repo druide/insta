@@ -22,15 +22,7 @@
   "icon": "images/icon.png",
   "activationEvents": [
     "workspaceContains:Cargo.lock",
-    "onLanguage:rust",
-    "onLanguage:insta-snapshots",
-    "onView:pendingInstaSnapshots",
-    "onCommand:mitsuhiko.insta.open-snapshot-diff",
-    "onCommand:mitsuhiko.insta.accept-snapshot",
-    "onCommand:mitsuhiko.insta.reject-snapshot",
-    "onCommand:mitsuhiko.insta.switch-snapshot-view",
-    "onCommand:mitsuhiko.insta.accept-all-snapshots",
-    "onCommand:mitsuhiko.insta.reject-all-snapshots"
+    "onLanguage:rust"
   ],
   "main": "./out/extension",
   "contributes": {

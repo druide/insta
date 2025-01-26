@@ -1,12 +1,9 @@
-use std::{
-    borrow::Cow,
-    env,
-    io::Write,
-    path::Path,
-    process::{Command, Stdio},
-};
+#[cfg(any(feature = "_cargo_insta_internal", not(target_arch = "wasm32")))]
+use std::env;
+use std::{borrow::Cow, path::Path};
 
 /// Are we running in in a CI environment?
+#[cfg(not(target_arch = "wasm32"))]
 pub fn is_ci() -> bool {
     match env::var("CI").ok().as_deref() {
         Some("false") | Some("0") | Some("") => false,
@@ -17,6 +14,10 @@ pub fn is_ci() -> bool {
 
 #[cfg(feature = "colors")]
 pub use console::style;
+#[cfg(not(target_arch = "wasm32"))]
+use std::io::Write;
+#[cfg(not(target_arch = "wasm32"))]
+use std::process::{Command, Stdio};
 
 #[cfg(not(feature = "colors"))]
 mod fake_colors {
@@ -76,32 +77,35 @@ pub fn path_to_storage(path: &Path) -> String {
 
 /// Tries to format a given rust expression with rustfmt
 pub fn format_rust_expression(value: &str) -> Cow<'_, str> {
-    const PREFIX: &str = "const x:() = ";
-    const SUFFIX: &str = ";\n";
-    if let Ok(mut proc) = Command::new("rustfmt")
-        .arg("--emit=stdout")
-        .arg("--edition=2018")
-        .stdin(Stdio::piped())
-        .stdout(Stdio::piped())
-        .stderr(Stdio::null())
-        .spawn()
+    #[cfg(not(target_arch = "wasm32"))]
     {
+        const PREFIX: &str = "const x:() = ";
+        const SUFFIX: &str = ";\n";
+        if let Ok(mut proc) = Command::new("rustfmt")
+            .arg("--emit=stdout")
+            .arg("--edition=2018")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
         {
-            let stdin = proc.stdin.as_mut().unwrap();
-            stdin.write_all(PREFIX.as_bytes()).unwrap();
-            stdin.write_all(value.as_bytes()).unwrap();
-            stdin.write_all(SUFFIX.as_bytes()).unwrap();
-        }
-        if let Ok(output) = proc.wait_with_output() {
-            if output.status.success() {
-                // slice between after the prefix and before the suffix
-                // (currently 14 from the start and 2 before the end, respectively)
-                let start = PREFIX.len() + 1;
-                let end = output.stdout.len() - SUFFIX.len();
-                return std::str::from_utf8(&output.stdout[start..end])
-                    .unwrap()
-                    .replace("\r\n", "\n")
-                    .into();
+            {
+                let stdin = proc.stdin.as_mut().unwrap();
+                stdin.write_all(PREFIX.as_bytes()).unwrap();
+                stdin.write_all(value.as_bytes()).unwrap();
+                stdin.write_all(SUFFIX.as_bytes()).unwrap();
+            }
+            if let Ok(output) = proc.wait_with_output() {
+                if output.status.success() {
+                    // slice between after the prefix and before the suffix
+                    // (currently 14 from the start and 2 before the end, respectively)
+                    let start = PREFIX.len() + 1;
+                    let end = output.stdout.len() - SUFFIX.len();
+                    return std::str::from_utf8(&output.stdout[start..end])
+                        .unwrap()
+                        .replace("\r\n", "\n")
+                        .into();
+                }
             }
         }
     }
@@ -117,9 +121,11 @@ pub fn get_cargo() -> std::ffi::OsString {
     cargo.to_os_string()
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn test_format_rust_expression() {
     use crate::assert_snapshot;
+    assert_snapshot!(format_rust_expression("vec![1,2,3]"));
     assert_snapshot!(format_rust_expression("vec![1,2,3]"), @"vec![1, 2, 3]");
     assert_snapshot!(format_rust_expression("vec![1,2,3].iter()"), @"vec![1, 2, 3].iter()");
     assert_snapshot!(format_rust_expression(r#"    "aoeu""#), @r###""aoeu""###);

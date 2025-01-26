@@ -1,0 +1,10 @@
+[target.wasm32-wasip1]
+runner = 'wasmedge --dir .:.'
+rustflags = ["--cfg", "wasmedge", "--cfg", "tokio_unstable"]
+
+[profile.release]
+strip = true
+opt-level = "z"
+lto = true
+codegen-units = 1
+panic = "abort"

@@ -4,3 +4,5 @@ target
 .aider*
 .env
 .idea
+*.new
+*.vsix

@@ -174,7 +174,7 @@ export class SnapshotPathProvider implements DefinitionProvider {
       mode: "exact" | "wildcard-prefix" | "wildcard-all"
     ): string {
       return workspace.asRelativePath(
-        `${snapshotMatch.path}/snapshots/${mode !== "exact" ? "*__" : ""}${
+        `${snapshotMatch.path}/tests/snapshots/${mode !== "exact" ? "*__" : ""}${
           snapshotMatch.localModuleName
         }${mode === "wildcard-all" ? "__*" : ""}__${
           snapshotMatch.snapshotName

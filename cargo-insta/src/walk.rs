@@ -69,7 +69,7 @@ pub(crate) fn make_snapshot_walker(
         builder.hidden(false);
     } else {
         // We add a custom hidden filter; if we used the standard filter we'd skip over `.pending-snap` files
-        builder.filter_entry(|e| e.file_type().map_or(false, |x| x.is_file()) || !is_hidden(e));
+        builder.filter_entry(|e| e.file_type().is_some_and(|x| x.is_file()) || !is_hidden(e));
     }
 
     let mut override_builder = OverrideBuilder::new(package_root);
@@ -87,7 +87,7 @@ pub(crate) fn make_snapshot_walker(
     // Add a custom filter to skip interior crates; otherwise we get duplicate
     // snapshots (https://github.com/mitsuhiko/insta/issues/396)
     builder.filter_entry(move |entry| {
-        if entry.file_type().map_or(false, |ft| ft.is_dir())
+        if entry.file_type().is_some_and(|ft| ft.is_dir())
             && entry.path().join("Cargo.toml").exists()
             && entry.path() != root_path
         {

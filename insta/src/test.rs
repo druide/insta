@@ -1,4 +1,4 @@
 #[test]
 fn test_embedded_test() {
-    assert_snapshot!("embedded", "Just a string");
+    assert_snapshot!("Just a string", @"Just a string");
 }

@@ -10,6 +10,87 @@
 [![Documentation](https://docs.rs/insta/badge.svg)](https://docs.rs/insta)
 [![VSCode Extension](https://img.shields.io/visual-studio-marketplace/v/mitsuhiko.insta?label=vscode%20extension)](https://marketplace.visualstudio.com/items?itemName=mitsuhiko.insta)
 
+## Fork
+
+This is a forked version of the original library which allows to run snapshot
+tests for the `WASM` build targets, in the `WasmEdge` or directly in the browser.
+
+1. Install [WasmEdge](https://wasmedge.org/).
+
+2. To run tests in the browser follow [wasm-bindgen-test](https://rustwasm.github.io/wasm-bindgen/wasm-bindgen-test/index.html) instructions.
+
+3. Install `cargo-insta`:
+   
+   ```bash
+   cargo install --git https://github.com/druide/insta.git cargo-insta --locked
+   ```
+
+4. Add `.cargo/config.toml` to your workspace:
+   
+   ```toml
+   [target.wasm32-wasip1]
+   runner = 'wasmedge --dir .:.'
+   rustflags = ["--cfg", "wasmedge", "--cfg", "tokio_unstable"]
+   
+   [target.wasm32-unknown-unknown]
+   runner = 'wasm-bindgen-test-runner'
+   ```
+
+5. Add dev dependency to the `Cargo.toml`:
+   
+   ```toml
+   [dev-dependencies]
+   insta = { version = "1.43.0", git = "https://github.com/druide/insta.git", features = ["yaml"] }
+   ```
+
+6. Run tests with the `WasmEdge`:
+   
+   ```bash
+   cargo test --target wasm32-wasip1 -- --nocapture
+   
+   # or if you have a workspace
+   cargo test --target wasm32-wasip1 -p your-lib-name --lib -- --nocapture
+   ```
+
+7. Run tests in the browser:
+   
+   ```bash
+   wasm-pack test --chrome
+   
+   # or directly with the cargo test
+   NO_HEADLESS=1 WASM_BINDGEN_USE_BROWSER=1 cargo test --target wasm32-unknown-unknown -- --nocapture
+   
+   # Windows version
+   set NO_HEADLESS=1 && set WASM_BINDGEN_USE_BROWSER=1 && cargo test --target wasm32-unknown-unknown -- --nocapture
+   ```
+   
+   To make file-based asserts working in the browser, add the file `test.rs` to your lib:
+   
+   ```rust
+   /// Initialize test FS.
+   #[cfg(test)]
+   pub fn init() {
+       // should be in a standalone file to avoid duplicates
+       insta::include_dir!("tests/snapshots");
+   }
+   ```
+   
+   and this before tests:
+   
+   ```rust
+   #[cfg_attr(all(target_family = "wasm", target_os = "unknown"), wasm_bindgen_test)]
+   #[test]
+   fn test_1() {
+       crate::test::init();
+   
+       // test...
+       let v = "some text";
+       assert_snapshot!(v);
+   }
+   ```
+
+8. Default snapshots location is `tests/snapshots`.
+
 ## Introduction
 
 Snapshots tests (also sometimes called approval tests) are tests that

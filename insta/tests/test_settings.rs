@@ -70,7 +70,7 @@ fn test_settings_macro() {
 
 #[test]
 fn test_snapshot_path() {
-    with_settings!({snapshot_path => "snapshots2"}, {
+    with_settings!({snapshot_path => "tests/snapshots2"}, {
         assert_debug_snapshot!(vec![1, 2, 3]);
     });
 }

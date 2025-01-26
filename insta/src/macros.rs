@@ -19,12 +19,39 @@ macro_rules! _function_name {
 #[macro_export]
 macro_rules! _get_workspace_root {
     () => {{
-        use std::env;
+        #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+        {
+            use std::env;
 
-        // Note the `env!("CARGO_MANIFEST_DIR")` needs to be in the macro (in
-        // contrast to a function in insta) because the macro needs to capture
-        // the value in the caller library, an exclusive property of macros.
-        $crate::_macro_support::get_cargo_workspace(env!("CARGO_MANIFEST_DIR"))
+            // Note the `env!("CARGO_MANIFEST_DIR")` needs to be in the macro (in
+            // contrast to a function in insta) because the macro needs to capture
+            // the value in the caller library, an exclusive property of macros.
+            $crate::_macro_support::get_cargo_workspace(env!("CARGO_MANIFEST_DIR"))
+        }
+        #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+        {
+            use std::path::PathBuf;
+            PathBuf::from("")
+        }
+    }};
+}
+
+#[doc(hidden)]
+#[macro_export]
+macro_rules! _get_manifest_dir {
+    () => {{
+        use std::path::PathBuf;
+        #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+        {
+            use std::env;
+
+            // Note the `env!("CARGO_MANIFEST_DIR")` needs to be in the macro (in
+            // contrast to a function in insta) because the macro needs to capture
+            // the value in the caller library, an exclusive property of macros.
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        }
+        #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+        PathBuf::from("")
     }};
 }
 
@@ -365,6 +392,7 @@ macro_rules! _assert_snapshot_base {
                 $transform(&$value).as_str(),
             ).into(),
             $crate::_get_workspace_root!().as_path(),
+            $crate::_get_manifest_dir!().as_path(),
             $crate::_function_name!(),
             module_path!(),
             file!(),
@@ -408,6 +436,7 @@ macro_rules! assert_binary_snapshot {
             }
             .into(),
             $crate::_get_workspace_root!().as_path(),
+            $crate::_get_manifest_dir!().as_path(),
             $crate::_function_name!(),
             module_path!(),
             file!(),
@@ -595,4 +624,14 @@ macro_rules! allow_duplicates {
             $($x)*
         })
     }
+}
+
+#[macro_export]
+macro_rules! include_dir {
+    ($($arg:tt)*) => {
+        #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+        {
+            let _ = $crate::FS.get_or_init(|| $crate::_macro_support::include_dir!($($arg)*));
+        }
+    };
 }

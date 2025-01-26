@@ -26,15 +26,16 @@ fn test_binary_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_binary_pending__binary_snapshot.snap.new
-    +      src/snapshots/test_binary_pending__binary_snapshot.snap.new.txt
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_binary_pending__binary_snapshot.snap.new
+    +      tests/snapshots/test_binary_pending__binary_snapshot.snap.new.txt
     ");
 }
 
@@ -66,15 +67,16 @@ fn test_binary_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_binary_accept__binary_snapshot.snap
-    +      src/snapshots/test_binary_accept__binary_snapshot.snap.txt
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_binary_accept__binary_snapshot.snap
+    +      tests/snapshots/test_binary_accept__binary_snapshot.snap.txt
     ");
 }
 
@@ -123,17 +125,18 @@ fn test_binary_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,10 @@
+    @@ -1,4 +1,11 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_binary_change_extension__binary_snapshot.snap
-    +      src/snapshots/test_binary_change_extension__binary_snapshot.snap.new
-    +      src/snapshots/test_binary_change_extension__binary_snapshot.snap.new.json
-    +      src/snapshots/test_binary_change_extension__binary_snapshot.snap.txt
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_binary_change_extension__binary_snapshot.snap
+    +      tests/snapshots/test_binary_change_extension__binary_snapshot.snap.new
+    +      tests/snapshots/test_binary_change_extension__binary_snapshot.snap.new.json
+    +      tests/snapshots/test_binary_change_extension__binary_snapshot.snap.txt
     ");
 
     let output = test_project
@@ -147,15 +150,16 @@ fn test_binary_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_binary_change_extension__binary_snapshot.snap
-    +      src/snapshots/test_binary_change_extension__binary_snapshot.snap.json
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_binary_change_extension__binary_snapshot.snap
+    +      tests/snapshots/test_binary_change_extension__binary_snapshot.snap.json
     ");
 }
 
@@ -198,13 +202,14 @@ fn test_binary_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,6 @@
+    @@ -1,4 +1,7 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
+    +  tests
+    +    tests/snapshots
     ");
 }
 
@@ -236,14 +241,15 @@ fn test() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_change_text_to_binary__test.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_change_text_to_binary__test.snap
     ");
 
     test_project.update_file(
@@ -267,15 +273,16 @@ fn test() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_change_text_to_binary__test.snap
-    +      src/snapshots/test_change_text_to_binary__test.snap.txt
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_change_text_to_binary__test.snap
+    +      tests/snapshots/test_change_text_to_binary__test.snap.txt
     ");
 }
 
@@ -307,15 +314,16 @@ fn test() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_change_binary_to_text__some_name.snap
-    +      src/snapshots/test_change_binary_to_text__some_name.snap.json
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_change_binary_to_text__some_name.snap
+    +      tests/snapshots/test_change_binary_to_text__some_name.snap.json
     ");
 
     test_project.update_file(
@@ -339,14 +347,15 @@ fn test() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_change_binary_to_text__some_name.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_change_binary_to_text__some_name.snap
     ");
 }
 
@@ -380,15 +389,16 @@ fn test_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_binary_unreferenced_delete__snapshot.snap
-    +      src/snapshots/test_binary_unreferenced_delete__snapshot.snap.txt
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_binary_unreferenced_delete__snapshot.snap
+    +      tests/snapshots/test_binary_unreferenced_delete__snapshot.snap.txt
     ");
 
     // Run cargo insta test with --unreferenced=delete
@@ -410,12 +420,13 @@ fn test_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,6 @@
+    @@ -1,4 +1,7 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
+    +  tests
+    +    tests/snapshots
     ");
 }

@@ -73,11 +73,7 @@ impl FilePatcher {
                 // duplicate
                 //
                 // See https://github.com/mitsuhiko/insta/issues/340
-                if self
-                    .inline_snapshots
-                    .last()
-                    .map_or(false, |x| x.end.0 > line)
-                {
+                if self.inline_snapshots.last().is_some_and(|x| x.end.0 > line) {
                     return false;
                 }
                 self.inline_snapshots.push(snapshot);

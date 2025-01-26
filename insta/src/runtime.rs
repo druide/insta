@@ -2,13 +2,18 @@ use std::cell::RefCell;
 use std::collections::{BTreeMap, BTreeSet};
 use std::error::Error;
 use std::fs;
-use std::io::{ErrorKind, Write};
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+use std::io::ErrorKind;
+use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
 use std::str;
 use std::sync::{Arc, Mutex};
 use std::{borrow::Cow, env};
 
+#[cfg(not(target_arch = "wasm32"))]
+use crate::env::snapshot_update_behavior;
+use crate::log;
 use crate::settings::Settings;
 use crate::snapshot::{
     MetaData, PendingInlineSnapshot, Snapshot, SnapshotContents, SnapshotKind, TextSnapshotContents,
@@ -16,10 +21,7 @@ use crate::snapshot::{
 use crate::utils::{path_to_storage, style};
 use crate::{env::get_tool_config, output::SnapshotPrinter};
 use crate::{
-    env::{
-        memoize_snapshot_file, snapshot_update_behavior, OutputBehavior, SnapshotUpdateBehavior,
-        ToolConfig,
-    },
+    env::{memoize_snapshot_file, OutputBehavior, SnapshotUpdateBehavior, ToolConfig},
     snapshot::TextSnapshotKind,
 };
 
@@ -258,40 +260,38 @@ fn get_snapshot_filename(
     module_path: &str,
     assertion_file: &str,
     snapshot_name: &str,
-    cargo_workspace: &Path,
+    manifest_dir: &Path,
     is_doctest: bool,
 ) -> PathBuf {
-    let root = Path::new(cargo_workspace);
+    let root = Path::new(manifest_dir);
     let base = Path::new(assertion_file);
     Settings::with(|settings| {
-        root.join(base.parent().unwrap())
-            .join(settings.snapshot_path())
-            .join({
-                use std::fmt::Write;
-                let mut f = String::new();
-                if settings.prepend_module_to_snapshot() {
-                    if is_doctest {
-                        write!(
-                            &mut f,
-                            "doctest_{}__",
-                            base.file_name()
-                                .unwrap()
-                                .to_string_lossy()
-                                .replace('.', "_")
-                        )
-                        .unwrap();
-                    } else {
-                        write!(&mut f, "{}__", module_path.replace("::", "__")).unwrap();
-                    }
+        root.join(settings.snapshot_path()).join({
+            use std::fmt::Write;
+            let mut f = String::new();
+            if settings.prepend_module_to_snapshot() {
+                if is_doctest {
+                    write!(
+                        &mut f,
+                        "doctest_{}__",
+                        base.file_name()
+                            .unwrap()
+                            .to_string_lossy()
+                            .replace('.', "_")
+                    )
+                    .unwrap();
+                } else {
+                    write!(&mut f, "{}__", module_path.replace("::", "__")).unwrap();
                 }
-                write!(
-                    &mut f,
-                    "{}.snap",
-                    snapshot_name.replace(&['/', '\\'][..], "__")
-                )
-                .unwrap();
-                f
-            })
+            }
+            write!(
+                &mut f,
+                "{}.snap",
+                snapshot_name.replace(&['/', '\\'][..], "__")
+            )
+            .unwrap();
+            f
+        })
     })
 }
 
@@ -318,12 +318,22 @@ impl<'a> SnapshotAssertionContext<'a> {
     fn prepare(
         new_snapshot_value: &SnapshotValue<'a>,
         workspace: &'a Path,
+        manifest_dir: &'a Path,
         function_name: &'a str,
         module_path: &'a str,
         assertion_file: &'a str,
         assertion_line: u32,
     ) -> Result<SnapshotAssertionContext<'a>, Box<dyn Error>> {
-        let tool_config = get_tool_config(workspace);
+        let current_str = manifest_dir.to_string_lossy().to_string();
+        let workspace_str = workspace.to_string_lossy().to_string();
+        let snapshots_parent_dir =
+            if workspace_str.is_empty() || current_str.starts_with(&workspace_str) {
+                manifest_dir
+            } else {
+                workspace
+            };
+
+        let tool_config = get_tool_config(snapshots_parent_dir);
         let snapshot_name;
         let mut duplication_key = None;
         let mut snapshot_file = None;
@@ -351,10 +361,10 @@ impl<'a> SnapshotAssertionContext<'a> {
                     module_path,
                     assertion_file,
                     &name,
-                    workspace,
+                    snapshots_parent_dir,
                     is_doctest,
                 );
-                if fs::metadata(&file).is_ok() {
+                if Snapshot::exists(&file) {
                     old_snapshot = Some(Snapshot::from_file(&file)?);
                 }
                 snapshot_name = Some(name);
@@ -375,7 +385,7 @@ impl<'a> SnapshotAssertionContext<'a> {
                 snapshot_name = detect_snapshot_name(function_name, module_path)
                     .ok()
                     .map(Cow::Owned);
-                let mut pending_file = workspace.join(assertion_file);
+                let mut pending_file = snapshots_parent_dir.join(assertion_file);
                 pending_file.set_file_name(format!(
                     ".{}.pending-snap",
                     pending_file
@@ -477,6 +487,7 @@ impl<'a> SnapshotAssertionContext<'a> {
     /// Removes any old .snap.new.* files that belonged to previous pending snapshots. This should
     /// only ever remove maximum one file because we do this every time before we create a new
     /// pending snapshot.
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
     pub fn cleanup_previous_pending_binary_snapshots(&self) -> Result<(), Box<dyn Error>> {
         if let Some(ref path) = self.snapshot_file {
             // The file name to compare against has to be valid utf-8 as it is generated by this crate
@@ -493,7 +504,12 @@ impl<'a> SnapshotAssertionContext<'a> {
             // We have to loop over where whole directory here because there is no filesystem API
             // for getting files by prefix.
             for entry in read_dir? {
-                let entry = entry?;
+                let entry = match entry {
+                    Ok(entry) => entry,
+                    Err(_) => {
+                        continue;
+                    }
+                };
                 let entry_file_name = entry.file_name();
 
                 // We'll just skip over files with non-utf-8 names. The assumption being that those
@@ -521,9 +537,12 @@ impl<'a> SnapshotAssertionContext<'a> {
         let unseen = self
             .snapshot_file
             .as_ref()
-            .map_or(false, |x| fs::metadata(x).is_ok());
+            .is_some_and(|x| fs::metadata(x).is_ok());
         let should_print = self.tool_config.output_behavior() != OutputBehavior::Nothing;
+        #[cfg(not(target_arch = "wasm32"))]
         let snapshot_update = snapshot_update_behavior(&self.tool_config, unseen);
+        #[cfg(target_arch = "wasm32")]
+        let snapshot_update = SnapshotUpdateBehavior::NoUpdate;
 
         // If snapshot_update is `InPlace` and we have an inline snapshot, then
         // use `NewFile`, since we can't use `InPlace` for inline. `cargo-insta`
@@ -636,7 +655,7 @@ impl<'a> SnapshotAssertionContext<'a> {
             && self.tool_config.output_behavior() != OutputBehavior::Nothing
             && !self.is_doctest
         {
-            println!(
+            log!(
                 "{hint}",
                 hint = style("To update snapshots run `cargo insta review`").dim(),
             );
@@ -649,7 +668,7 @@ impl<'a> SnapshotAssertionContext<'a> {
                 } else {
                     "Stopped on the first failure. Run `cargo insta test` to run all snapshots."
                 };
-                println!("{hint}", hint = style(msg).dim(),);
+                log!("{hint}", hint = style(msg).dim(),);
             }
 
             // if we are in glob mode, count the failures and print the
@@ -707,7 +726,7 @@ fn record_snapshot_duplicate(
     let key = ctx.duplication_key.as_deref().unwrap();
     if let Some(prev_snapshot) = results.get(key) {
         if prev_snapshot.contents() != snapshot.contents() {
-            println!("Snapshots in allow-duplicates block do not match.");
+            log!("Snapshots in allow-duplicates block do not match.");
             let mut printer = SnapshotPrinter::new(ctx.workspace, Some(prev_snapshot), snapshot);
             printer.set_line(Some(ctx.assertion_line));
             printer.set_snapshot_file(ctx.snapshot_file.as_deref());
@@ -758,6 +777,7 @@ where
 pub fn assert_snapshot(
     snapshot_value: SnapshotValue<'_>,
     workspace: &Path,
+    manifest_dir: &Path,
     function_name: &str,
     module_path: &str,
     assertion_file: &str,
@@ -767,12 +787,14 @@ pub fn assert_snapshot(
     let ctx = SnapshotAssertionContext::prepare(
         &snapshot_value,
         workspace,
+        manifest_dir,
         function_name,
         module_path,
         assertion_file,
         assertion_line,
     )?;
 
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
     ctx.cleanup_previous_pending_binary_snapshots()?;
 
     let content = match snapshot_value {

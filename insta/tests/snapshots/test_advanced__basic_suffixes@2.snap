@@ -1,5 +1,5 @@
 ---
-source: insta/tests/test_advanced.rs
+source: tests/test_advanced.rs
 expression: "&value"
 ---
 2

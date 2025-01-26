@@ -1,0 +1,5 @@
+---
+source: src/utils.rs
+expression: "format_rust_expression(\"vec![1,2,3]\")"
+---
+vec![1, 2, 3]

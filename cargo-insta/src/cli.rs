@@ -7,9 +7,10 @@ use std::{io, process};
 
 use console::{set_colors_enabled, style, Key, Term};
 use insta::_cargo_insta_support::{
-    get_cargo, is_ci, SnapshotPrinter, SnapshotUpdate, TestRunner, ToolConfig,
-    UnreferencedSnapshots,
+    get_cargo, SnapshotPrinter, TestRunner, ToolConfig, UnreferencedSnapshots,
 };
+#[cfg(not(target_arch = "wasm32"))]
+use insta::_cargo_insta_support::{is_ci, SnapshotUpdate};
 use insta::{internals::SnapshotContents, Snapshot};
 use itertools::Itertools;
 use semver::Version;

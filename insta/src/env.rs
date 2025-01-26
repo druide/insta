@@ -4,7 +4,9 @@ use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 use std::{env, fmt, fs};
 
-use crate::utils::is_ci;
+#[cfg(not(target_arch = "wasm32"))]
+pub use crate::utils::is_ci;
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 use crate::{
     content::{yaml, Content},
     elog,
@@ -12,6 +14,7 @@ use crate::{
 
 use once_cell::sync::Lazy;
 
+#[cfg(not(target_arch = "wasm32"))]
 static WORKSPACES: Lazy<Mutex<BTreeMap<String, Arc<PathBuf>>>> =
     Lazy::new(|| Mutex::new(BTreeMap::new()));
 static TOOL_CONFIGS: Lazy<Mutex<BTreeMap<PathBuf, Arc<ToolConfig>>>> =
@@ -44,24 +47,32 @@ impl TestRunner {
     /// Fall back to `cargo test` if `cargo nextest` isn't installed and
     /// `test_runner_fallback` is true
     pub fn resolve_fallback(&self, test_runner_fallback: bool) -> &TestRunner {
-        use crate::utils::get_cargo;
-        if self == &TestRunner::Nextest
-            && test_runner_fallback
-            && std::process::Command::new(get_cargo())
-                .arg("nextest")
-                .arg("--version")
-                .output()
-                .map(|output| !output.status.success())
-                .unwrap_or(true)
+        #[cfg(not(target_arch = "wasm32"))]
+        {
+            use crate::utils::get_cargo;
+            if self == &TestRunner::Nextest
+                && test_runner_fallback
+                && std::process::Command::new(get_cargo())
+                    .arg("nextest")
+                    .arg("--version")
+                    .output()
+                    .map(|output| !output.status.success())
+                    .unwrap_or(true)
+            {
+                &TestRunner::Auto
+            } else {
+                self
+            }
+        }
+        #[cfg(target_arch = "wasm32")]
         {
             &TestRunner::Auto
-        } else {
-            self
         }
     }
 }
 
 /// Controls how information is supposed to be displayed.
+#[allow(unused)]
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum OutputBehavior {
     /// Diff only
@@ -87,6 +98,7 @@ pub enum UnreferencedSnapshots {
 
 /// Snapshot update flag
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[allow(dead_code)]
 pub enum SnapshotUpdate {
     Always,
     Auto,
@@ -96,11 +108,11 @@ pub enum SnapshotUpdate {
     Force,
 }
 
+#[allow(unused)]
 #[derive(Debug)]
 pub enum Error {
     Deserialize(crate::content::Error),
     Env(&'static str),
-    #[allow(unused)]
     Config(&'static str),
 }
 
@@ -152,6 +164,7 @@ pub struct ToolConfig {
 
 impl ToolConfig {
     /// Loads the tool config from a cargo workspace.
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
     pub fn from_workspace(workspace_dir: &Path) -> Result<ToolConfig, Error> {
         let mut cfg = None;
         for choice in &[".config/insta.yaml", "insta.yaml", ".insta.yaml"] {
@@ -327,7 +340,33 @@ impl ToolConfig {
         })
     }
 
-    // TODO: Do we want all these methods, vs. just allowing access to the fields?
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+    pub fn from_workspace(_workspace_dir: &Path) -> Result<ToolConfig, Error> {
+        Ok(ToolConfig {
+            force_pass: false,
+            require_full_match: false,
+            output: OutputBehavior::Diff,
+            snapshot_update: SnapshotUpdate::No,
+            #[cfg(feature = "glob")]
+            glob_fail_fast: false,
+            #[cfg(feature = "_cargo_insta_internal")]
+            test_runner_fallback: false,
+            #[cfg(feature = "_cargo_insta_internal")]
+            test_runner: TestRunner::Auto,
+            #[cfg(feature = "_cargo_insta_internal")]
+            test_unreferenced: UnreferencedSnapshots::Ignore,
+            #[cfg(feature = "_cargo_insta_internal")]
+            auto_review: false,
+            #[cfg(feature = "_cargo_insta_internal")]
+            auto_accept_unseen: false,
+            #[cfg(feature = "_cargo_insta_internal")]
+            review_include_ignored: false,
+            #[cfg(feature = "_cargo_insta_internal")]
+            review_include_hidden: false,
+            #[cfg(feature = "_cargo_insta_internal")]
+            review_warn_undiscovered: false,
+        })
+    }
 
     /// Should we fail if metadata doesn't match?
     pub fn require_full_match(&self) -> bool {
@@ -407,6 +446,7 @@ pub enum SnapshotUpdateBehavior {
 }
 
 /// Returns the intended snapshot update behavior.
+#[cfg(not(target_arch = "wasm32"))]
 pub fn snapshot_update_behavior(tool_config: &ToolConfig, unseen: bool) -> SnapshotUpdateBehavior {
     match tool_config.snapshot_update() {
         SnapshotUpdate::Always => SnapshotUpdateBehavior::InPlace,
@@ -433,64 +473,77 @@ pub fn snapshot_update_behavior(tool_config: &ToolConfig, unseen: bool) -> Snaps
 /// Returns the cargo workspace path for a crate manifest, like
 /// `/Users/janedoe/projects/insta` when passed
 /// `/Users/janedoe/projects/insta/insta/Cargo.toml`.
+#[allow(unused_variables)]
 pub fn get_cargo_workspace(manifest_dir: &str) -> Arc<PathBuf> {
     // If INSTA_WORKSPACE_ROOT environment variable is set, use the value as-is.
     // This is useful where CARGO_MANIFEST_DIR at compilation points to some
     // transient location. This can easily happen when building the test in one
     // directory but running it in another.
-    if let Ok(workspace_root) = env::var("INSTA_WORKSPACE_ROOT") {
-        return PathBuf::from(workspace_root).into();
+    #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+    {
+        if let Ok(workspace_root) = env::var("INSTA_WORKSPACE_ROOT") {
+            return PathBuf::from(workspace_root).into();
+        }
     }
 
-    let error_message = || {
-        format!(
-            "`cargo metadata --format-version=1 --no-deps` in path `{}`",
-            manifest_dir
-        )
-    };
+    #[cfg(target_arch = "wasm32")]
+    {
+        Arc::new(PathBuf::from(""))
+    }
 
-    WORKSPACES
-        .lock()
-        // we really do not care about poisoning here.
-        .unwrap()
-        .entry(manifest_dir.to_string())
-        .or_insert_with(|| {
-            let output = std::process::Command::new(
-                env::var("CARGO").unwrap_or_else(|_| "cargo".to_string()),
+    #[cfg(not(target_arch = "wasm32"))]
+    {
+        let error_message = || {
+            format!(
+                "`cargo metadata --format-version=1 --no-deps` in path `{}`",
+                manifest_dir
             )
-            .args(["metadata", "--format-version=1", "--no-deps"])
-            .current_dir(manifest_dir)
-            .output()
-            .unwrap_or_else(|e| panic!("failed to run {}\n\n{}", error_message(), e));
+        };
 
-            crate::content::yaml::vendored::yaml::YamlLoader::load_from_str(
-                std::str::from_utf8(&output.stdout).unwrap(),
-            )
-            .map_err(|e| e.to_string())
-            .and_then(|docs| {
-                docs.into_iter()
-                    .next()
-                    .ok_or_else(|| "No content found in yaml".to_string())
-            })
-            .and_then(|metadata| {
-                metadata["workspace_root"]
-                    .clone()
-                    .into_string()
-                    .ok_or_else(|| "Couldn't find `workspace_root`".to_string())
-            })
-            .map(|path| PathBuf::from(path).into())
-            .unwrap_or_else(|e| {
-                panic!(
-                    "failed to parse cargo metadata output from {}: {}\n\n{:?}",
-                    error_message(),
-                    e,
-                    output.stdout
+        WORKSPACES
+            .lock()
+            // we really do not care about poisoning here.
+            .unwrap()
+            .entry(manifest_dir.to_string())
+            .or_insert_with(|| {
+                let output = std::process::Command::new(
+                    env::var("CARGO").unwrap_or_else(|_| "cargo".to_string()),
                 )
+                .args(["metadata", "--format-version=1", "--no-deps"])
+                .current_dir(manifest_dir)
+                .output()
+                .unwrap_or_else(|e| panic!("failed to run {}\n\n{}", error_message(), e));
+
+                crate::content::yaml::vendored::yaml::YamlLoader::load_from_str(
+                    std::str::from_utf8(&output.stdout).unwrap(),
+                )
+                .map_err(|e| e.to_string())
+                .and_then(|docs| {
+                    docs.into_iter()
+                        .next()
+                        .ok_or_else(|| "No content found in yaml".to_string())
+                })
+                .and_then(|metadata| {
+                    metadata["workspace_root"]
+                        .clone()
+                        .into_string()
+                        .ok_or_else(|| "Couldn't find `workspace_root`".to_string())
+                })
+                .map(|path| PathBuf::from(path).into())
+                .unwrap_or_else(|e| {
+                    panic!(
+                        "failed to parse cargo metadata output from {}: {}\n\n{:?}",
+                        error_message(),
+                        e,
+                        output.stdout
+                    )
+                })
             })
-        })
-        .clone()
+            .clone()
+    }
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn test_get_cargo_workspace() {
     let workspace = get_cargo_workspace(env!("CARGO_MANIFEST_DIR"));
@@ -541,6 +594,7 @@ pub fn memoize_snapshot_file(snapshot_file: &Path) {
     }
 }
 
+#[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
 fn resolve<'a>(value: &'a Content, path: &[&str]) -> Option<&'a Content> {
     path.iter()
         .try_fold(value, |node, segment| match node.resolve_inner() {

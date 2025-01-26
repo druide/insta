@@ -1,3 +1,5 @@
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use crate::settings::DEFAULT_SNAPSHOTS_PATH;
 use crate::{
     content::{self, json, yaml, Content},
     elog,
@@ -10,8 +12,10 @@ use std::fs;
 use std::io::{BufRead, BufReader, Write};
 use std::path::{Path, PathBuf};
 use std::rc::Rc;
-use std::time::{SystemTime, UNIX_EPOCH};
 use std::{borrow::Cow, fmt};
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+use std::{collections::HashMap, sync::OnceLock};
+use web_time::{SystemTime, UNIX_EPOCH};
 
 static RUN_ID: Lazy<String> = Lazy::new(|| {
     if let Ok(run_id) = env::var("NEXTEST_RUN_ID") {
@@ -21,6 +25,9 @@ static RUN_ID: Lazy<String> = Lazy::new(|| {
         format!("{}-{}", d.as_secs(), d.subsec_nanos())
     }
 });
+
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+pub static FS: OnceLock<HashMap<&std::path::Path, &[u8]>> = OnceLock::new();
 
 /// Holds a pending inline snapshot loaded from a json file or read from an assert
 /// macro (doesn't write to the rust file, which is done by `cargo-insta`)
@@ -137,16 +144,13 @@ impl PendingInlineSnapshot {
     }
 }
 
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum SnapshotKind {
+    #[default]
     Text,
-    Binary { extension: String },
-}
-
-impl Default for SnapshotKind {
-    fn default() -> Self {
-        SnapshotKind::Text
-    }
+    Binary {
+        extension: String,
+    },
 }
 
 /// Snapshot metadata information.
@@ -199,11 +203,9 @@ impl MetaData {
     /// Returns the relative source path.
     pub fn get_relative_source(&self, base: &Path) -> Option<PathBuf> {
         self.source.as_ref().map(|source| {
-            base.join(source)
-                .canonicalize()
-                .ok()
-                .and_then(|s| s.strip_prefix(base).ok().map(|x| x.to_path_buf()))
-                .unwrap_or_else(|| base.to_path_buf())
+            let p = base.to_string_lossy().to_string();
+            let p = p.replace('\\', "/") + "/";
+            PathBuf::from(source.strip_prefix(&p).unwrap_or(source))
         })
     }
 
@@ -271,7 +273,28 @@ impl MetaData {
     fn as_content(&self) -> Content {
         let mut fields = Vec::new();
         if let Some(source) = self.source.as_deref() {
-            fields.push(("source", Content::from(source)));
+            let manifest_dir = crate::_get_manifest_dir!();
+            let manifest_dir_str = manifest_dir.to_string_lossy();
+            if manifest_dir_str.is_empty() {
+                fields.push(("source", Content::from(source)));
+            } else {
+                let m = manifest_dir
+                    .file_name()
+                    .map(|m| m.to_str().unwrap_or(""))
+                    .unwrap_or("");
+                if m.is_empty() {
+                    fields.push(("source", Content::from(source)));
+                } else {
+                    fields.push((
+                        "source",
+                        Content::from(
+                            source
+                                .strip_prefix(&(m.to_string() + "/"))
+                                .unwrap_or(source),
+                        ),
+                    ));
+                }
+            }
         }
         if let Some(line) = self.assertion_line {
             fields.push(("assertion_line", Content::from(line)));
@@ -336,9 +359,48 @@ pub struct Snapshot {
 }
 
 impl Snapshot {
+    pub fn exists(file: &Path) -> bool {
+        #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+        {
+            fs::metadata(file).is_ok()
+        }
+
+        #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+        {
+            let Some(fs) = FS.get() else {
+                return false;
+            };
+            fs.get(file.strip_prefix(DEFAULT_SNAPSHOTS_PATH).unwrap())
+                .is_some()
+        }
+    }
+
     /// Loads a snapshot from a file.
     pub fn from_file(p: &Path) -> Result<Snapshot, Box<dyn Error>> {
+        #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
         let mut f = BufReader::new(fs::File::open(p)?);
+
+        #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+        let mut f = {
+            let Some(fs) = FS.get() else {
+                return Err(Box::new(std::io::Error::new(
+                    std::io::ErrorKind::Other,
+                    "fs is not initialized",
+                )));
+            };
+            let Some(file) = fs.get(&p.strip_prefix(DEFAULT_SNAPSHOTS_PATH).unwrap()) else {
+                return Err(Box::new(std::io::Error::from(std::io::ErrorKind::NotFound)));
+            };
+            let file = match std::str::from_utf8(file) {
+                Ok(file) => file,
+                Err(e) => {
+                    return Err(Box::new(e));
+                }
+            };
+            let reader = stringreader::StringReader::new(file);
+            BufReader::new(reader)
+        };
+
         let mut buf = String::new();
 
         f.read_line(&mut buf)?;
@@ -404,7 +466,22 @@ impl Snapshot {
             }
             SnapshotKind::Binary { ref extension } => {
                 let path = build_binary_path(extension, p);
+                #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
                 let contents = fs::read(path)?;
+
+                #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+                let contents = {
+                    let Some(fs) = FS.get() else {
+                        return Err(Box::new(std::io::Error::new(
+                            std::io::ErrorKind::Other,
+                            "fs is not initialized",
+                        )));
+                    };
+                    let Some(file) = fs.get(&Path::new(&path)) else {
+                        return Err(Box::new(std::io::Error::from(std::io::ErrorKind::NotFound)));
+                    };
+                    file.to_vec()
+                };
 
                 SnapshotContents::Binary(Rc::new(contents))
             }
@@ -849,7 +926,7 @@ fn names_of_path(path: &Path) -> (String, String) {
 #[test]
 fn test_names_of_path() {
     assert_debug_snapshot!(
-        names_of_path(Path::new("/src/snapshots/insta_tests__tests__name_foo.snap")), @r###"
+        names_of_path(Path::new("/tests/snapshots/insta_tests__tests__name_foo.snap")), @r###"
     (
         "name_foo",
         "insta_tests__tests",
@@ -857,7 +934,7 @@ fn test_names_of_path() {
     "###
     );
     assert_debug_snapshot!(
-        names_of_path(Path::new("/src/snapshots/name_foo.snap")), @r###"
+        names_of_path(Path::new("/tests/snapshots/name_foo.snap")), @r###"
     (
         "name_foo",
         "",
@@ -865,7 +942,7 @@ fn test_names_of_path() {
     "###
     );
     assert_debug_snapshot!(
-        names_of_path(Path::new("foo/src/snapshots/go1.20.5.snap")), @r###"
+        names_of_path(Path::new("foo/tests/snapshots/go1.20.5.snap")), @r###"
     (
         "go1.20.5",
         "",
@@ -1160,12 +1237,13 @@ fn test_inline_snapshot_value_newline() {
     assert_eq!(normalize_inline_snapshot("\n"), "");
 }
 
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn test_parse_yaml_error() {
     use std::env::temp_dir;
     let mut temp = temp_dir();
     temp.push("bad.yaml");
-    let mut f = fs::File::create(temp.clone()).unwrap();
+    let mut f = std::fs::File::create(temp.clone()).unwrap();
 
     let invalid = r#"---
     This is invalid yaml:

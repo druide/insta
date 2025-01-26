@@ -1,5 +1,5 @@
 ---
-source: insta/tests/test_basic.rs
+source: tests/test_basic.rs
 expression: td
 ---
 TestDisplay struct

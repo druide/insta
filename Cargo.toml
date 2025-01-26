@@ -31,6 +31,8 @@ install-path = "CARGO_HOME"
 inherits = "release"
 lto = "thin"
 
+[profile.dev.package.similar]
+opt-level = 3
+
 [workspace.dependencies]
-# Needs pinning in Cargo.lock because of MSRV
-clap = { version = "4.1", features = ["derive", "env"] }
+clap = { version = "4.5", features = ["derive", "env"] }

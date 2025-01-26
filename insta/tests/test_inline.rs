@@ -10,6 +10,7 @@ use insta::assert_yaml_snapshot;
 use insta::{assert_compact_json_snapshot, assert_json_snapshot};
 
 use insta::{assert_compact_debug_snapshot, assert_debug_snapshot, assert_snapshot};
+#[cfg(not(target_arch = "wasm32"))]
 use std::thread;
 
 #[test]
@@ -39,6 +40,7 @@ fn test_single_line() {
 
 // We used to use the thread name for snapshot name detection.  This is unreliable
 // so this test now basically does exactly the same as `test_unnamed_single_line`.
+#[cfg(not(target_arch = "wasm32"))]
 #[test]
 fn test_unnamed_thread_single_line() {
     let builder = thread::Builder::new().name("foo::lol::something".into());

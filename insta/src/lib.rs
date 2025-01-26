@@ -35,11 +35,11 @@
 //! * [Read the main documentation](https://insta.rs/docs/) which does not just
 //!   cover the API of the crate but also many of the details of how it works.
 //! * There is a screencast that shows the entire workflow: [watch the insta
-//! introduction screencast](https://www.youtube.com/watch?v=rCHrMqE4JOY&feature=youtu.be).
+//!   introduction screencast](https://www.youtube.com/watch?v=rCHrMqE4JOY&feature=youtu.be).
 //!
 //! # Writing Tests
 //!
-//! ```
+//! ```text
 //! use insta::assert_debug_snapshot;
 //!
 //! #[test]
@@ -317,22 +317,27 @@ pub mod internals {
     };
 }
 
+#[cfg(all(target_family = "wasm", target_os = "unknown"))]
+pub use crate::snapshot::FS;
+
+pub use crate::settings::DEFAULT_SNAPSHOTS_PATH;
+
 // exported for cargo-insta only
 #[doc(hidden)]
 #[cfg(feature = "_cargo_insta_internal")]
 pub mod _cargo_insta_support {
+    #[cfg(not(target_arch = "wasm32"))]
+    pub use crate::env::{is_ci, SnapshotUpdate};
     pub use crate::{
         content::Error as ContentError,
         env::{
-            Error as ToolConfigError, OutputBehavior, SnapshotUpdate, TestRunner, ToolConfig,
-            UnreferencedSnapshots,
+            Error as ToolConfigError, OutputBehavior, TestRunner, ToolConfig, UnreferencedSnapshots,
         },
         output::SnapshotPrinter,
         snapshot::PendingInlineSnapshot,
         snapshot::SnapshotContents,
         snapshot::TextSnapshotContents,
         utils::get_cargo,
-        utils::is_ci,
     };
 }
 
@@ -349,6 +354,9 @@ pub mod _macro_support {
         assert_snapshot, with_allow_duplicates, AutoName, BinarySnapshotValue, InlineValue,
         SnapshotValue,
     };
+
+    #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+    pub use include_dir_macro::include_dir;
 
     #[cfg(feature = "serde")]
     pub use crate::serialization::{serialize_value, SerializationFormat, SnapshotLocation};

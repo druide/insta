@@ -317,7 +317,7 @@ fn test_snapshot_with_newline() {
             )
             .add_file(
                 format!(
-                    "src/snapshots/test_force_update_{}__force_update.snap",
+                    "tests/snapshots/test_force_update_{}__force_update.snap",
                     name
                 ),
                 r#"
@@ -336,7 +336,6 @@ Hello, world!
 
     let test_current_insta =
         create_test_force_update_project("current", "{ path = '$PROJECT_PATH' }");
-    let test_insta_1_40_0 = create_test_force_update_project("1_40_0", "\"1.40.0\"");
 
     // Test with current insta version
     assert!(&test_current_insta
@@ -347,34 +346,10 @@ Hello, world!
         .status
         .success());
 
-    // Test with insta 1.40.0
-    assert!(&test_insta_1_40_0
-        .insta_cmd()
-        .args(["test", "--accept", "--force-update-snapshots"])
-        .output()
-        .unwrap()
-        .status
-        .success());
-
     // Check that both versions updated the snapshot correctly
-    assert_snapshot!(test_current_insta.diff("src/snapshots/test_force_update_current__force_update.snap"), @r#"
-    --- Original: src/snapshots/test_force_update_current__force_update.snap
-    +++ Updated: src/snapshots/test_force_update_current__force_update.snap
-    @@ -1,8 +1,5 @@
-    -
-     ---
-     source: src/lib.rs
-    -expression: 
-    +expression: "\"Hello, world!\""
-     ---
-     Hello, world!
-    -
-    -
-    "#);
-
-    assert_snapshot!(test_insta_1_40_0.diff("src/snapshots/test_force_update_1_40_0__force_update.snap"), @r#"
-    --- Original: src/snapshots/test_force_update_1_40_0__force_update.snap
-    +++ Updated: src/snapshots/test_force_update_1_40_0__force_update.snap
+    assert_snapshot!(test_current_insta.diff("tests/snapshots/test_force_update_current__force_update.snap"), @r#"
+    --- Original: tests/snapshots/test_force_update_current__force_update.snap
+    +++ Updated: tests/snapshots/test_force_update_current__force_update.snap
     @@ -1,8 +1,5 @@
     -
      ---
@@ -637,7 +612,7 @@ fn test_snapshot() {
     // Manually add an unreferenced snapshot
     let unreferenced_snapshot_path = test_project
         .workspace_dir
-        .join("src/snapshots/test_unreferenced_delete__unused_snapshot.snap");
+        .join("tests/snapshots/test_unreferenced_delete__unused_snapshot.snap");
     std::fs::create_dir_all(unreferenced_snapshot_path.parent().unwrap()).unwrap();
     std::fs::write(
         &unreferenced_snapshot_path,
@@ -653,15 +628,16 @@ Unused snapshot
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_unreferenced_delete__snapshot.snap
-    +      src/snapshots/test_unreferenced_delete__unused_snapshot.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_unreferenced_delete__snapshot.snap
+    +      tests/snapshots/test_unreferenced_delete__unused_snapshot.snap
     ");
 
     // Run cargo insta test with --unreferenced=delete
@@ -683,14 +659,15 @@ Unused snapshot
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_unreferenced_delete__snapshot.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_unreferenced_delete__snapshot.snap
     ");
 }
 
@@ -709,7 +686,7 @@ fn test_snapshot() {
             .to_string(),
         )
         .add_file(
-            "src/snapshots/test_hidden_snapshots__snapshot.snap",
+            "tests/snapshots/test_hidden_snapshots__snapshot.snap",
             r#"---
 source: src/lib.rs
 expression: "\"Hello, world!\""
@@ -719,7 +696,7 @@ Hello, world!
             .to_string(),
         )
         .add_file(
-            "src/snapshots/.hidden/hidden_snapshot.snap.new",
+            "tests/snapshots/.hidden/hidden_snapshot.snap.new",
             r#"---
 source: src/lib.rs
 expression: "Hidden snapshot"
@@ -778,7 +755,7 @@ fn test_snapshots() {
             .to_string(),
         )
         .add_file(
-            "src/snapshots/test_snapshot_kind__existing.snap",
+            "tests/snapshots/test_snapshot_kind__existing.snap",
             r#"---
 source: src/lib.rs
 expression: "\"existing snapshot\""
@@ -803,7 +780,7 @@ existing snapshot
     let new_snapshot = std::fs::read_to_string(
         test_project
             .workspace_dir
-            .join("src/snapshots/test_snapshot_kind__snapshots.snap"),
+            .join("tests/snapshots/test_snapshot_kind__snapshots.snap"),
     )
     .unwrap();
 

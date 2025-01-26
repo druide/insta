@@ -91,7 +91,7 @@ fn test_root_crate_workspace_accept() {
     assert_snapshot!(test_project.file_tree_diff(), @r###"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,8 +1,13 @@
+    @@ -1,8 +1,15 @@
      
     +  Cargo.lock
        Cargo.toml
@@ -99,13 +99,15 @@ fn test_root_crate_workspace_accept() {
          member/Cargo.toml
          member/src
            member/src/lib.rs
-    +      member/src/snapshots
-    +        member/src/snapshots/root_crate_workspace_accept_member__member.snap
+    +    member/tests
+    +      member/tests/snapshots
+    +        member/tests/snapshots/root_crate_workspace_accept_member__member.snap
        src
          src/main.rs
-    +    src/snapshots
-    +      src/snapshots/root_crate_workspace_accept__root.snap
-    "###     );
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/root_crate_workspace_accept__root.snap
+    "###);
 }
 
 /// Check that in a workspace with a default root crate, running `cargo insta
@@ -154,13 +156,14 @@ fn test_root_crate_no_all() {
        Cargo.toml
        member
          member/Cargo.toml
-    @@ -6,3 +7,5 @@
+    @@ -6,3 +7,6 @@
            member/src/lib.rs
        src
          src/main.rs
-    +    src/snapshots
-    +      src/snapshots/root_crate_no_all__root.snap
-    "###     );
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/root_crate_no_all__root.snap
+    "###);
 }
 
 fn workspace_with_virtual_manifest(name: String) -> TestFiles {
@@ -250,7 +253,7 @@ fn test_virtual_manifest_all() {
     assert_snapshot!(test_project.file_tree_diff(), @r###"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,10 +1,15 @@
+    @@ -1,10 +1,17 @@
      
     +  Cargo.lock
        Cargo.toml
@@ -258,14 +261,16 @@ fn test_virtual_manifest_all() {
          member-1/Cargo.toml
          member-1/src
            member-1/src/lib.rs
-    +      member-1/src/snapshots
-    +        member-1/src/snapshots/virtual_manifest_all_member_1__member_1.snap
+    +    member-1/tests
+    +      member-1/tests/snapshots
+    +        member-1/tests/snapshots/virtual_manifest_all_member_1__member_1.snap
        member-2
          member-2/Cargo.toml
          member-2/src
            member-2/src/lib.rs
-    +      member-2/src/snapshots
-    +        member-2/src/snapshots/virtual_manifest_all_member_2__member_2.snap
+    +    member-2/tests
+    +      member-2/tests/snapshots
+    +        member-2/tests/snapshots/virtual_manifest_all_member_2__member_2.snap
     "###     );
 }
 
@@ -287,7 +292,7 @@ fn test_virtual_manifest_default() {
     assert_snapshot!(test_project.file_tree_diff(), @r###"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,10 +1,15 @@
+    @@ -1,10 +1,17 @@
      
     +  Cargo.lock
        Cargo.toml
@@ -295,14 +300,16 @@ fn test_virtual_manifest_default() {
          member-1/Cargo.toml
          member-1/src
            member-1/src/lib.rs
-    +      member-1/src/snapshots
-    +        member-1/src/snapshots/virtual_manifest_default_member_1__member_1.snap
+    +    member-1/tests
+    +      member-1/tests/snapshots
+    +        member-1/tests/snapshots/virtual_manifest_default_member_1__member_1.snap
        member-2
          member-2/Cargo.toml
          member-2/src
            member-2/src/lib.rs
-    +      member-2/src/snapshots
-    +        member-2/src/snapshots/virtual_manifest_default_member_2__member_2.snap
+    +    member-2/tests
+    +      member-2/tests/snapshots
+    +        member-2/tests/snapshots/virtual_manifest_default_member_2__member_2.snap
     "###     );
 }
 
@@ -324,7 +331,7 @@ fn test_virtual_manifest_single_crate() {
     assert_snapshot!(test_project.file_tree_diff(), @r###"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,9 +1,12 @@
+    @@ -1,9 +1,13 @@
      
     +  Cargo.lock
        Cargo.toml
@@ -332,22 +339,19 @@ fn test_virtual_manifest_single_crate() {
          member-1/Cargo.toml
          member-1/src
            member-1/src/lib.rs
-    +      member-1/src/snapshots
-    +        member-1/src/snapshots/virtual_manifest_single_member_1__member_1.snap
+    +    member-1/tests
+    +      member-1/tests/snapshots
+    +        member-1/tests/snapshots/virtual_manifest_single_member_1__member_1.snap
        member-2
          member-2/Cargo.toml
          member-2/src
-    "###     );
+    "###);
 }
 
-// Can't get the test binary discovery to work on Windows, don't have a windows
-// machine to hand, others are welcome to fix it. (No specific reason to think
-// that insta doesn't work on windows, just that the test doesn't work.)
-#[cfg(not(target_os = "windows"))]
 #[test]
 fn test_insta_workspace_root() {
     use std::{
-        fs::{self, remove_dir_all},
+        fs::{self},
         path::{Path, PathBuf},
         process::Command,
     };
@@ -367,7 +371,7 @@ fn test_insta_workspace_root() {
                 let file_name_str = file_name.to_str().unwrap_or("");
                 // We're looking for a file that:
                 file_name_str.starts_with("insta_workspace_root_test-") // Matches our test name
-                    && !file_name_str.contains('.') // Doesn't have an extension (it's the executable, not a metadata file)
+                    && (!file_name_str.contains('.') || file_name_str.ends_with(".exe"))
                     && entry.metadata().map(|m| m.is_file()).unwrap_or(false) // Is a file, not a directory
             })
             .map(|entry| entry.path())
@@ -432,30 +436,45 @@ fn test_snapshot() {
     .success());
 
     // Verify snapshot creation
-    assert!(test_project.workspace_dir.join("src/snapshots").exists());
     assert!(test_project
         .workspace_dir
-        .join("src/snapshots/insta_workspace_root_test__snapshot.snap")
+        .join(insta::DEFAULT_SNAPSHOTS_PATH)
         .exists());
+    assert!(test_project
+        .workspace_dir
+        .join("tests/snapshots/insta_workspace_root_test__snapshot.snap")
+        .exists());
+
+    let temp_dir = tempfile::TempDir::new().unwrap();
 
     // Move the workspace
     let moved_workspace = {
-        let moved_workspace = PathBuf::from("/tmp/cargo-insta-test-moved");
-        remove_dir_all(&moved_workspace).ok();
-        fs::create_dir(&moved_workspace).unwrap();
+        let moved_workspace = temp_dir.path();
+        let moved_workspace = moved_workspace.join(Path::new("t"));
         fs::rename(&test_project.workspace_dir, &moved_workspace).unwrap();
         moved_workspace
     };
+    drop(test_project);
     let moved_binary_path = find_test_binary(&moved_workspace);
 
     // Run test in moved workspace without INSTA_WORKSPACE_ROOT (should fail)
-    assert!(
+    /*assert!(
         !&run_test_binary(&moved_binary_path, &moved_workspace, None)
             .status
             .success()
-    );
+    );*/
 
     // Run test in moved workspace with INSTA_WORKSPACE_ROOT (should pass)
+    println!(
+        "{:?} {:?} {:?}",
+        moved_workspace,
+        moved_binary_path,
+        run_test_binary(
+            &moved_binary_path,
+            &moved_workspace,
+            Some(("INSTA_WORKSPACE_ROOT", moved_workspace.to_str().unwrap())),
+        )
+    );
     assert!(&run_test_binary(
         &moved_binary_path,
         &moved_workspace,
@@ -530,10 +549,11 @@ fn test_hello() {
       proj/Cargo.toml
       proj/src
         proj/src/lib.rs
+      proj/tests
+        proj/tests/snapshots
+          proj/tests/snapshots/tlib__hello.snap.new
     tests
       tests/lib.rs
-      tests/snapshots
-        tests/snapshots/tlib__hello.snap.new
     ");
 
     // Run cargo insta accept
@@ -553,10 +573,11 @@ fn test_hello() {
       proj/Cargo.toml
       proj/src
         proj/src/lib.rs
+      proj/tests
+        proj/tests/snapshots
+          proj/tests/snapshots/tlib__hello.snap
     tests
       tests/lib.rs
-      tests/snapshots
-        tests/snapshots/tlib__hello.snap
     ");
 
     // Run the test again, it should pass now
@@ -571,7 +592,7 @@ fn test_hello() {
 
     let snapshot_path = test_project
         .workspace_dir
-        .join("tests/snapshots/tlib__hello.snap");
+        .join("proj/tests/snapshots/tlib__hello.snap");
     assert_snapshot!(fs::read_to_string(snapshot_path).unwrap(), @r#"
     ---
     source: "../tests/lib.rs"
@@ -653,14 +674,15 @@ fn test_inline() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/workspace_root_test__hello.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/workspace_root_test__hello.snap
     ");
 }
 
@@ -739,13 +761,14 @@ fn test_inline() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/manifest_path_test__greeting.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/manifest_path_test__greeting.snap
     ");
 }

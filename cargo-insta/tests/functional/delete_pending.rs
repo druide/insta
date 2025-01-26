@@ -35,15 +35,16 @@ fn test_snapshot_file() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,8 @@
+    @@ -1,4 +1,9 @@
      
     +  Cargo.lock
        Cargo.toml
        src
     +    src/.lib.rs.pending-snap
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/delete_unreferenced__snapshot_file.snap.new
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/delete_unreferenced__snapshot_file.snap.new
     ");
 
     // Now remove the tests; the pending snapshots should be deleted when
@@ -61,13 +62,14 @@ fn test_snapshot_file() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,6 @@
+    @@ -1,4 +1,7 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
+    +  tests
+    +    tests/snapshots
     ");
 }
 
@@ -107,14 +109,15 @@ fn test_file_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
     ");
 
     // Modify the tests to make them fail
@@ -149,16 +152,17 @@ fn test_file_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,9 @@
+    @@ -1,4 +1,10 @@
      
     +  Cargo.lock
        Cargo.toml
        src
     +    src/.lib.rs.pending-snap
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap.new
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap.new
     ");
 
     // Run `cargo insta reject` to delete pending snapshots
@@ -174,14 +178,15 @@ fn test_file_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
     ");
 
     // Run the tests again to create pending snapshots
@@ -197,16 +202,17 @@ fn test_file_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,9 @@
+    @@ -1,4 +1,10 @@
      
     +  Cargo.lock
        Cargo.toml
        src
     +    src/.lib.rs.pending-snap
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap.new
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap.new
     ");
 
     // Modify the test back so they pass
@@ -241,13 +247,14 @@ fn test_file_snapshot() {
     assert_snapshot!(test_project.file_tree_diff(), @r"
     --- Original file tree
     +++ Updated file tree
-    @@ -1,4 +1,7 @@
+    @@ -1,4 +1,8 @@
      
     +  Cargo.lock
        Cargo.toml
        src
          src/lib.rs
-    +    src/snapshots
-    +      src/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
+    +  tests
+    +    tests/snapshots
+    +      tests/snapshots/test_combined_snapshot_deletion__file_snapshot.snap
     ");
 }

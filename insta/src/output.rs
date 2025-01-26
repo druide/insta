@@ -1,11 +1,22 @@
 use std::borrow::Cow;
-use std::{path::Path, time::Duration};
+use std::path::Path;
+use web_time::Duration;
 
 use similar::{Algorithm, ChangeTag, TextDiff};
 
 use crate::content::yaml;
 use crate::snapshot::{MetaData, Snapshot, SnapshotContents};
 use crate::utils::{format_rust_expression, style, term_width};
+
+#[macro_export]
+macro_rules! log {
+    ( $( $t:tt )* ) => {
+        #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
+        println!( $( $t )* );
+        #[cfg(all(target_family = "wasm", target_os = "unknown"))]
+        web_sys::console::log_1(&format!( $( $t )* ).into());
+    }
+}
 
 /// Snapshot printer utility.
 pub struct SnapshotPrinter<'a> {
@@ -69,7 +80,9 @@ impl<'a> SnapshotPrinter<'a> {
     pub fn print(&self) {
         if let Some(title) = self.title {
             let width = term_width();
-            println!(
+            #[cfg(all(target_os = "wasi", target_env = "p1"))]
+            log!("FAILED");
+            log!(
                 "{title:━^width$}",
                 title = style(format!(" {} ", title)).bold(),
                 width = width
@@ -107,20 +120,20 @@ impl<'a> SnapshotPrinter<'a> {
         if self.show_info {
             self.print_info();
         }
-        println!("Snapshot Contents:");
+        log!("Snapshot Contents:");
 
         match self.new_snapshot.contents() {
             SnapshotContents::Text(new_contents) => {
                 let new_contents = new_contents.to_string();
 
-                println!("──────┬{:─^1$}", "", width.saturating_sub(7));
+                log!("──────┬{:─^1$}", "", width.saturating_sub(7));
                 for (idx, line) in new_contents.lines().enumerate() {
-                    println!("{:>5} │ {}", style(idx + 1).cyan().dim().bold(), line);
+                    log!("{:>5} │ {}", style(idx + 1).cyan().dim().bold(), line);
                 }
-                println!("──────┴{:─^1$}", "", width.saturating_sub(7));
+                log!("──────┴{:─^1$}", "", width.saturating_sub(7));
             }
             SnapshotContents::Binary(_) => {
-                println!(
+                log!(
                     "{}",
                     encode_file_link_escape(
                         &self
@@ -145,7 +158,7 @@ impl<'a> SnapshotPrinter<'a> {
 
         if let Some(old_snapshot) = self.old_snapshot {
             if old_snapshot.contents().is_binary() {
-                println!(
+                log!(
                     "{}",
                     style(format_args!(
                         "-{}: {}",
@@ -162,7 +175,7 @@ impl<'a> SnapshotPrinter<'a> {
         }
 
         if self.new_snapshot.contents().is_binary() {
-            println!(
+            log!(
                 "{}",
                 style(format_args!(
                     "+{}: {}",
@@ -205,20 +218,20 @@ impl<'a> SnapshotPrinter<'a> {
                 .diff_lines(old_text, new_text);
 
             if old.is_some() {
-                println!(
+                log!(
                     "{}",
                     style(format_args!("-{}", self.old_snapshot_hint)).red()
                 );
             }
 
             if new.is_some() {
-                println!(
+                log!(
                     "{}",
                     style(format_args!("+{}", self.new_snapshot_hint)).green()
                 );
             }
 
-            println!("────────────┬{:─^1$}", "", width.saturating_sub(13));
+            log!("────────────┬{:─^1$}", "", width.saturating_sub(13));
 
             // This is to make sure that binary and text snapshots are never reported as being
             // equal (that would otherwise happen if the text snapshot is an empty string).
@@ -226,14 +239,15 @@ impl<'a> SnapshotPrinter<'a> {
 
             for (idx, group) in diff.grouped_ops(4).iter().enumerate() {
                 if idx > 0 {
-                    println!("┈┈┈┈┈┈┈┈┈┈┈┈┼{:┈^1$}", "", width.saturating_sub(13));
+                    log!("┈┈┈┈┈┈┈┈┈┈┈┈┼{:┈^1$}", "", width.saturating_sub(13));
                 }
+                let mut collect_str = String::new();
                 for op in group {
                     for change in diff.iter_inline_changes(op) {
                         match change.tag() {
                             ChangeTag::Insert => {
                                 has_changes = true;
-                                print!(
+                                collect_str += &format!(
                                     "{:>5} {:>5} │{}",
                                     "",
                                     style(change.new_index().unwrap()).cyan().dim().bold(),
@@ -242,15 +256,16 @@ impl<'a> SnapshotPrinter<'a> {
                                 for &(emphasized, change) in change.values() {
                                     let change = render_invisible(change, newlines_matter);
                                     if emphasized {
-                                        print!("{}", style(change).green().underlined());
+                                        collect_str +=
+                                            &format!("{}", style(change).green().underlined());
                                     } else {
-                                        print!("{}", style(change).green());
+                                        collect_str += &format!("{}", style(change).green());
                                     }
                                 }
                             }
                             ChangeTag::Delete => {
                                 has_changes = true;
-                                print!(
+                                collect_str += &format!(
                                     "{:>5} {:>5} │{}",
                                     style(change.old_index().unwrap()).cyan().dim(),
                                     "",
@@ -259,33 +274,38 @@ impl<'a> SnapshotPrinter<'a> {
                                 for &(emphasized, change) in change.values() {
                                     let change = render_invisible(change, newlines_matter);
                                     if emphasized {
-                                        print!("{}", style(change).red().underlined());
+                                        collect_str +=
+                                            &format!("{}", style(change).red().underlined());
                                     } else {
-                                        print!("{}", style(change).red());
+                                        collect_str += &format!("{}", style(change).red());
                                     }
                                 }
                             }
                             ChangeTag::Equal => {
-                                print!(
+                                collect_str += &format!(
                                     "{:>5} {:>5} │ ",
                                     style(change.old_index().unwrap()).cyan().dim(),
                                     style(change.new_index().unwrap()).cyan().dim().bold(),
                                 );
                                 for &(_, change) in change.values() {
                                     let change = render_invisible(change, newlines_matter);
-                                    print!("{}", style(change).dim());
+                                    collect_str += &format!("{}", style(change).dim());
                                 }
                             }
                         }
                         if change.missing_newline() {
-                            println!();
+                            log!("{}", collect_str);
+                            collect_str = String::new();
                         }
                     }
+                }
+                if !collect_str.is_empty() {
+                    log!("{}", collect_str);
                 }
             }
 
             if !has_changes {
-                println!(
+                log!(
                     "{:>5} {:>5} │{}",
                     "",
                     style("-").dim(),
@@ -293,7 +313,7 @@ impl<'a> SnapshotPrinter<'a> {
                 );
             }
 
-            println!("────────────┴{:─^1$}", "", width.saturating_sub(13));
+            log!("────────────┴{:─^1$}", "", width.saturating_sub(13));
         }
     }
 }
@@ -312,19 +332,19 @@ pub fn print_snapshot_summary(
             .ok()
             .map(|x| x.to_path_buf())
             .unwrap_or_else(|| snapshot_file.to_path_buf());
-        println!(
+        log!(
             "Snapshot file: {}",
             style(snapshot_file.display()).cyan().underlined()
         );
     }
     if let Some(name) = snapshot.snapshot_name() {
-        println!("Snapshot: {}", style(name).yellow());
+        log!("Snapshot: {}", style(name).yellow());
     } else {
-        println!("Snapshot: {}", style("<inline>").dim());
+        log!("Snapshot: {}", style("<inline>").dim());
     }
 
     if let Some(ref value) = snapshot.metadata().get_relative_source(workspace_root) {
-        println!(
+        log!(
             "Source: {}{}",
             style(value.display()).cyan(),
             line.or(
@@ -337,12 +357,12 @@ pub fn print_snapshot_summary(
     }
 
     if let Some(ref value) = snapshot.metadata().input_file() {
-        println!("Input file: {}", style(value).cyan());
+        log!("Input file: {}", style(value).cyan());
     }
 }
 
 fn print_line(width: usize) {
-    println!("{:─^1$}", "", width);
+    log!("{:─^1$}", "", width);
 }
 
 fn trailing_newline(s: &str) -> &str {
@@ -416,17 +436,17 @@ fn render_invisible(s: &str, newlines_matter: bool) -> Cow<'_, str> {
 fn print_info(metadata: &MetaData) {
     let width = term_width();
     if let Some(expr) = metadata.expression() {
-        println!("Expression: {}", style(format_rust_expression(expr)));
+        log!("Expression: {}", style(format_rust_expression(expr)));
         print_line(width);
     }
     if let Some(descr) = metadata.description() {
-        println!("{}", descr);
+        log!("{}", descr);
         print_line(width);
     }
     if let Some(info) = metadata.private_info() {
         let out = yaml::to_string(info);
         // TODO: does the yaml output always start with '---'?
-        println!("{}", out.trim().strip_prefix("---").unwrap().trim_start());
+        log!("{}", out.trim().strip_prefix("---").unwrap().trim_start());
         print_line(width);
     }
 }
@@ -434,7 +454,7 @@ fn print_info(metadata: &MetaData) {
 /// Encodes a path as an OSC-8 escape sequence. This makes it a clickable link in supported
 /// terminal emulators.
 fn encode_file_link_escape(path: &Path) -> String {
-    assert!(path.is_absolute());
+    //assert!(path.is_absolute());
     format!(
         "\x1b]8;;file://{}\x1b\\{}\x1b]8;;\x1b\\",
         path.display(),

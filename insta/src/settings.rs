@@ -17,10 +17,12 @@ use crate::filters::Filters;
 #[cfg(feature = "redactions")]
 use crate::redaction::{dynamic_redaction, sorted_redaction, ContentPath, Redaction, Selector};
 
+pub const DEFAULT_SNAPSHOTS_PATH: &str = "tests/snapshots";
+
 static DEFAULT_SETTINGS: Lazy<Arc<ActualSettings>> = Lazy::new(|| {
     Arc::new(ActualSettings {
         sort_maps: false,
-        snapshot_path: "snapshots".into(),
+        snapshot_path: PathBuf::from(DEFAULT_SNAPSHOTS_PATH),
         snapshot_suffix: "".into(),
         input_file: None,
         description: None,
@@ -149,14 +151,14 @@ impl ActualSettings {
 ///
 /// Example:
 ///
-/// ```ignore
+/// ```
 /// use insta;
 ///
 /// let mut settings = insta::Settings::clone_current();
 /// settings.set_sort_maps(true);
 /// settings.bind(|| {
 ///     // runs the assertion with the changed settings enabled
-///     insta::assert_snapshot!(...);
+///     insta::assert_snapshot!("test", @"test");
 /// });
 /// ```
 #[derive(Clone)]

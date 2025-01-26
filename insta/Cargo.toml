@@ -1,11 +1,11 @@
 [package]
 name = "insta"
-version = "1.42.0"
+version = "1.43.0"
 license = "Apache-2.0"
 authors = ["Armin Ronacher <armin.ronacher@active-4.com>"]
 description = "A snapshot testing library for Rust"
 edition = "2021"
-rust-version = "1.60.0"
+rust-version = "1.70.0"
 homepage = "https://insta.rs/"
 repository = "https://github.com/mitsuhiko/insta"
 keywords = ["snapshot", "testing", "jest", "approval"]
@@ -48,11 +48,11 @@ csv = { version = "1.1.6", optional = true }
 console = { version = "0.15.4", optional = true, default-features = false }
 pest = { version = "2.1.3", optional = true }
 pest_derive = { version = "2.1.0", optional = true }
-ron = { version = "0.7.1", optional = true }
-toml = { version = "0.5.7", optional = true }
+ron = { version = "0.8", optional = true }
+toml = { version = "0.8", optional = true }
 globset = { version = "0.4.6", optional = true }
 walkdir = { version = "2.3.1", optional = true }
-similar = { version = "2.1.0", features = ["inline"] }
+similar = { version = "2.7", features = ["inline"], path = "../similar" }
 regex = { version = "1.6.0", default-features = false, optional = true, features = [
     "std",
     "unicode",
@@ -60,11 +60,19 @@ regex = { version = "1.6.0", default-features = false, optional = true, features
 serde = { version = "1.0.117", optional = true }
 linked-hash-map = "0.5.6"
 once_cell = "1.20.2"
-# Not yet supported in our MSRV of 1.60.0
-# clap = { workspace=true, optional = true }
 clap = { version = "4.1", features = ["derive", "env"], optional = true }
+web-time = "1.1"
 
 [dev-dependencies]
 rustc_version = "0.4.0"
 serde = { version = "1.0.117", features = ["derive"] }
-similar-asserts = "1.4.2"
+similar-asserts = { version = "1.7", path = "../similar-asserts" }
+
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dependencies]
+wasm-bindgen = "0.2"
+web-sys = { version = "0.3", features = ["console"] }
+stringreader = "0.1"
+include-dir-macro = "0.2"
+
+[target.'cfg(all(target_family = "wasm", target_os = "unknown"))'.dev-dependencies]
+wasm-bindgen-test = "0.3"
